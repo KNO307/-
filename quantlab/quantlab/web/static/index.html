@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>QuantLab · 量化回测系统</title>
+<style>
+:root{
+  --ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--card:#fff;
+  --brand:#0f766e;--brand-dark:#115e59;--brand-soft:#ccfbf1;
+  --up:#15803d;--down:#b91c1c;--bench:#94a3b8;--radius:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:340px minmax(0,1fr);min-height:100vh}
+/* ---------------- sidebar ---------------- */
+.sidebar{background:#fff;border-right:1px solid var(--line);padding:26px 22px;position:sticky;
+  top:0;height:100vh;overflow-y:auto}
+.brand{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.brand span{font-size:11px;font-weight:600;color:#0f766e;background:var(--brand-soft);
+  border-radius:99px;padding:2px 8px;vertical-align:middle;margin-left:6px}
+.tagline{color:var(--muted);font-size:12px;margin:2px 0 22px}
+label{display:block;font-size:12px;color:#334155;font-weight:600;margin:14px 0 5px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;
+  font-size:13px;font-family:inherit;color:var(--ink);background:#fff;outline:none;transition:.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+textarea{resize:vertical;line-height:1.5}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{color:var(--muted);font-size:11.5px;margin:6px 0 0;min-height:30px}
+button{width:100%;margin-top:18px;padding:11px;border:none;border-radius:10px;cursor:pointer;
+  background:var(--brand);color:#fff;font-size:14px;font-weight:700;transition:.15s}
+button:hover{background:var(--brand-dark)}
+button:disabled{opacity:.55;cursor:wait}
+.note{color:var(--muted);font-size:11px;margin-top:12px}
+.meta{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;font-size:11.5px;color:var(--muted)}
+.meta b{color:#334155;font-weight:600}
+/* ---------------- main ---------------- */
+main{padding:26px 30px 60px;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  flex-wrap:wrap;margin-bottom:20px}
+h1{font-size:24px;margin:0;letter-spacing:-.02em}
+#subtitle{color:var(--muted);font-size:12.5px;margin:6px 0 0;max-width:820px}
+.actions{display:flex;align-items:center;gap:12px}
+#report{background:var(--brand-soft);color:var(--brand-dark);text-decoration:none;font-weight:700;
+  font-size:12.5px;border-radius:9px;padding:8px 14px;white-space:nowrap}
+#report:hover{background:#99f6e4}
+#status{font-size:12px;color:var(--muted);min-width:66px;text-align:right}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+.card .k{color:var(--muted);font-size:11.5px;margin-bottom:3px}
+.card .v{font-size:19px;font-weight:750;font-variant-numeric:tabular-nums}
+.card .v.up{color:var(--up)}.card .v.down{color:var(--down)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;margin-bottom:18px;min-width:0}
+.panel h2{font-size:14.5px;margin:0 0 12px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.legend{display:flex;gap:16px;color:var(--muted);font-size:11.5px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+canvas{width:100%;display:block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid2 .panel{margin-bottom:0}
+@media(max-width:1100px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto;
+  border-right:none;border-bottom:1px solid var(--line)}main{padding:20px}}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;font-size:11.5px;position:sticky;top:0;background:#fbfdff}
+tbody tr:hover{background:#f8fafc}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:700}
+.tag.buy{background:#dcfce7;color:#166534}.tag.sell{background:#fee2e2;color:#991b1b}
+.pos{color:var(--up)}.neg{color:var(--down)}
+.tablewrap{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:10px;
+  padding:9px 13px;font-size:12.5px;margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--brand-soft);color:var(--brand-dark);border-radius:99px;
+  padding:2px 9px;font-size:11px;font-weight:600}
+.heat{border-collapse:separate;border-spacing:2px;font-size:11px;width:100%}
+.heat th,.heat td{border:none;padding:4px 2px;text-align:center;border-radius:4px}
+.heat th{background:transparent;color:var(--muted);font-weight:500;font-size:10.5px}
+.heat td.year{font-weight:700;text-align:right;background:transparent;padding-right:6px}
+.empty{color:var(--muted);font-size:12.5px;padding:12px 0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;color:#334155}
+.kv span:nth-child(odd){color:var(--muted)}
+footer{color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:14px;margin-top:8px}
+.spinner{display:inline-block;width:11px;height:11px;border:2px solid #cbd5e1;
+  border-top-color:var(--brand);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-1px;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">QuantLab<span>v1.0</span></div>
+    <p class="tagline">事件驱动 · 日频回测 · 可复现研究</p>
+    <form id="form">
+      <label for="strategy">策略</label>
+      <select id="strategy"></select>
+      <p class="hint" id="strategyDesc"></p>
+
+      <label for="tickers">股票池（逗号分隔，自动追加 .us）</label>
+      <textarea id="tickers" rows="4" spellcheck="false"></textarea>
+
+      <div class="row">
+        <div><label for="start">开始日期</label><input type="date" id="start" value="2019-01-01"/></div>
+        <div><label for="end">结束日期</label><input type="date" id="end" value="2025-12-31"/></div>
+      </div>
+      <div class="row">
+        <div><label for="capital">初始资金 ($)</label><input type="number" id="capital" value="1000000" step="10000" min="10000"/></div>
+        <div><label for="topn">Top N</label><input type="number" id="topn" value="5" min="1" max="20"/></div>
+      </div>
+      <div class="row">
+        <div><label for="commission">佣金 (bp)</label><input type="number" id="commission" value="2" step="0.5" min="0"/></div>
+        <div><label for="slippage">滑点 (bp)</label><input type="number" id="slippage" value="5" min="0"/></div>
+      </div>
+      <button type="submit" id="runBtn">运行回测</button>
+      <p class="note">后端实时拉取 Stooq 日线并落盘缓存；若数据源不可用会自动回退到确定性合成行情，并在结果中明确标注。</p>
+    </form>
+    <div class="meta" id="meta">
+      <div><b>撮合规则</b>：t 收盘生成信号，t+1 开盘成交</div>
+      <div><b>成本模型</b>：佣金按成交额，滑点计入成交价</div>
+      <div><b>风控</b>：只做多、整数股、单票权重上限</div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <div>
+        <h1 id="title">回测工作台</h1>
+        <p id="subtitle">选择策略与股票池后运行回测，结果由后端真实计算并生成报告。</p>
+      </div>
+      <div class="actions">
+        <a id="report" href="#" target="_blank" rel="noopener" hidden>打开完整报告</a>
+        <span id="status"></span>
+      </div>
+    </div>
+
+    <div id="warnings"></div>
+    <section class="cards" id="cards"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>净值曲线</h2>
+        <div class="legend">
+          <span><i class="dot" style="background:#0f766e"></i>策略净值</span>
+          <span><i class="dot" style="background:#94a3b8"></i>基准</span>
+        </div>
+      </div>
+      <canvas id="equityChart" style="height:320px"></canvas>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <h2>回撤</h2>
+        <canvas id="ddChart" style="height:210px"></canvas>
+      </section>
+      <section class="panel">
+        <h2>月度收益 (%)</h2>
+        <div id="heatmap"><p class="empty">运行后显示</p></div>
+      </section>
+    </div>
+
+    <div class="grid2" style="margin-top:18px">
+      <section class="panel">
+        <h2>期末持仓</h2>
+        <div id="positions"><p class="empty">运行后显示</p></div>
+      </section>
+      <section class="panel">
+        <h2>数据与运行信息</h2>
+        <div id="sources"></div>
+        <div id="runinfo" style="margin-top:12px"></div>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top:18px">
+      <h2>成交明细 <span id="tradeCount" style="color:var(--muted);font-weight:400"></span></h2>
+      <div class="tablewrap" id="trades"><p class="empty">运行后显示</p></div>
+    </section>
+
+    <footer>QuantLab · 历史回测不代表未来收益，仅用于研究与教学。</footer>
+  </main>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { strategies: [], data: null };
+
+const fmtPct = (v, d = 2) => (v === null || v === undefined || Number.isNaN(v)) ? "—" : (v * 100).toFixed(d) + "%";
+const fmtNum = (v, d = 2) => (v === null || v === undefined || Number.isNaN(v)) ? "—" : Number(v).toFixed(d);
+const fmtMoney = (v) => (v === null || v === undefined) ? "—" : "$" + Math.round(v).toLocaleString("en-US");
+const clsOf = (v) => v > 0 ? "up" : (v < 0 ? "down" : "");
+
+async function api(path, options) {
+  const resp = await fetch(path, options);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || ("HTTP " + resp.status));
+  return data;
+}
+
+/* ------------------------------ 初始化 ------------------------------ */
+async function init() {
+  try {
+    const [s, u] = await Promise.all([api("/api/strategies"), api("/api/universe")]);
+    state.strategies = s.strategies;
+    $("strategy").innerHTML = s.strategies
+      .map((x) => `<option value="${x.name}">${x.label}</option>`).join("");
+    $("tickers").value = u.universe.join(", ");
+    updateStrategyDesc();
+    $("strategy").addEventListener("change", updateStrategyDesc);
+    $("form").addEventListener("submit", runBacktest);
+    window.addEventListener("resize", debounce(() => { if (state.data) drawCharts(state.data); }, 180));
+  } catch (err) {
+    setStatus("服务不可用", true);
+    showWarnings(["无法连接后端：" + err.message]);
+  }
+}
+
+function updateStrategyDesc() {
+  const s = state.strategies.find((x) => x.name === $("strategy").value);
+  $("strategyDesc").textContent = s ? s.description : "";
+  const isBuyHold = s && s.name === "buy_hold";
+  $("topn").disabled = isBuyHold;
+}
+
+function debounce(fn, ms) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function setStatus(text, isError) {
+  $("status").innerHTML = text ? (isError ? text : `<span class="spinner"></span>${text}`) : "";
+  $("status").style.color = isError ? "var(--down)" : "var(--muted)";
+}
+
+/* ------------------------------ 运行 ------------------------------ */
+async function runBacktest(ev) {
+  ev.preventDefault();
+  const name = $("strategy").value;
+  const params = {};
+  if (name !== "buy_hold") params.top_n = parseInt($("topn").value || "5", 10);
+  const body = {
+    strategy: name,
+    tickers: $("tickers").value,
+    start: $("start").value,
+    end: $("end").value,
+    capital: parseFloat($("capital").value),
+    commission_bp: parseFloat($("commission").value),
+    slippage_bp: parseFloat($("slippage").value),
+    params,
+  };
+  $("runBtn").disabled = true;
+  setStatus("回测计算中…");
+  try {
+    const data = await api("/api/backtest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    state.data = data;
+    render(data);
+    setStatus("");
+  } catch (err) {
+    setStatus("失败", true);
+    showWarnings(["回测失败：" + err.message]);
+  } finally {
+    $("runBtn").disabled = false;
+  }
+}
+
+/* ------------------------------ 渲染 ------------------------------ */
+function render(d) {
+  const m = d.metrics;
+  $("title").textContent = d.strategy.label;
+  $("subtitle").textContent =
+    `${d.config.start} ~ ${d.config.end} · ${d.config.tickers.length} 只标的 · ` +
+    `初始资金 ${fmtMoney(d.config.initial_capital)} · 佣金 ${d.config.commission_bp}bp / 滑点 ${d.config.slippage_bp}bp · ` +
+    `run ${d.run_id}`;
+  $("report").hidden = false;
+  $("report").href = d.report_url;
+
+  showWarnings(d.warnings || []);
+  renderCards(m);
+  drawCharts(d);
+  renderHeatmap(d.monthly);
+  renderPositions(d.positions);
+  renderSources(d);
+  renderTrades(d.trades, d.trades_total);
+}
+
+function showWarnings(list) {
+  $("warnings").innerHTML = (list || [])
+    .map((w) => `<div class="warn">${escapeHtml(w)}</div>`).join("");
+}
+
+function renderCards(m) {
+  const items = [
+    ["总收益", fmtPct(m.total_return), clsOf(m.total_return)],
+    ["年化收益 (CAGR)", fmtPct(m.cagr), clsOf(m.cagr)],
+    ["年化波动", fmtPct(m.annual_volatility), ""],
+    ["Sharpe", fmtNum(m.sharpe), clsOf(m.sharpe)],
+    ["Sortino", fmtNum(m.sortino), clsOf(m.sortino)],
+    ["最大回撤", fmtPct(m.max_drawdown), "down"],
+    ["Calmar", fmtNum(m.calmar), clsOf(m.calmar)],
+    ["基准收益", fmtPct(m.benchmark_return), clsOf(m.benchmark_return)],
+    ["超额收益", fmtPct(m.excess_return), clsOf(m.excess_return)],
+    ["信息比率", fmtNum(m.information_ratio), clsOf(m.information_ratio)],
+    ["Alpha / Beta", `${fmtPct(m.alpha)} / ${fmtNum(m.beta)}`, clsOf(m.alpha)],
+    ["期末权益", fmtMoney(m.final_equity), ""],
+    ["平均仓位", fmtPct(m.avg_exposure), ""],
+    ["年换手率", fmtNum(m.turnover), ""],
+    ["胜率（卖出）", fmtPct(m.win_rate), ""],
+    ["交易笔数", (m.num_trades || 0).toLocaleString(), ""],
+  ];
+  $("cards").innerHTML = items.map(([k, v, c]) =>
+    `<div class="card"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`).join("");
+}
+
+/* ------------------------------ 图表 ------------------------------ */
+function drawCharts(d) {
+  const eq = d.equity;
+  drawLine($("equityChart"), eq.dates, [
+    { values: eq.benchmark, color: "#94a3b8", width: 1.6 },
+    { values: eq.equity, color: "#0f766e", width: 2.2 },
+  ], { height: 320, money: true });
+  drawArea($("ddChart"), eq.dates, eq.drawdown, { height: 210 });
+}
+
+function setupCanvas(canvas, height) {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 800;
+  const cssH = height || canvas.clientHeight || 300;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.height = cssH + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  return { ctx, w: cssW, h: cssH };
+}
+
+function axes(ctx, w, h, padding, min, max, money) {
+  const x0 = padding.left, y0 = padding.top;
+  const plotW = w - padding.left - padding.right;
+  const plotH = h - padding.top - padding.bottom;
+  ctx.font = "11px -apple-system, 'Segoe UI', sans-serif";
+  ctx.textBaseline = "middle";
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const frac = i / steps;
+    const y = y0 + plotH - frac * plotH;
+    ctx.strokeStyle = "#eef2f7"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + plotW, y); ctx.stroke();
+    const value = min + frac * (max - min);
+    ctx.fillStyle = "#94a3b8"; ctx.textAlign = "right";
+    ctx.fillText(money ? compactMoney(value) : (value * 100).toFixed(0) + "%", x0 - 8, y);
+  }
+  return { x0, y0, plotW, plotH };
+}
+
+function compactMoney(v) {
+  if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(2) + "M";
+  if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(0) + "K";
+  return v.toFixed(0);
+}
+
+function dateLabels(ctx, dates, x0, y0, plotW, plotH) {
+  if (!dates.length) return;
+  const picks = [...new Set([0, Math.floor(dates.length / 4), Math.floor(dates.length / 2),
+    Math.floor(dates.length * 3 / 4), dates.length - 1])];
+  ctx.fillStyle = "#94a3b8"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const i of picks) {
+    const x = x0 + (dates.length > 1 ? plotW * i / (dates.length - 1) : 0);
+    ctx.fillText(dates[i], x, y0 + plotH + 8);
+  }
+}
+
+function drawLine(canvas, dates, series, opts) {
+  const { ctx, w, h } = setupCanvas(canvas, opts.height);
+  const values = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
+  if (!values.length) return;
+  let min = Math.min(...values), max = Math.max(...values);
+  const pad = (max - min) * 0.07 || max * 0.02 || 1;
+  min -= pad; max += pad;
+  const box = axes(ctx, w, h, { left: 62, right: 14, top: 12, bottom: 26 }, min, max, opts.money);
+  for (const s of series) {
+    ctx.beginPath();
+    s.values.forEach((v, i) => {
+      const x = box.x0 + (s.values.length > 1 ? box.plotW * i / (s.values.length - 1) : 0);
+      const y = box.y0 + box.plotH - (v - min) / (max - min) * box.plotH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.width; ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+  dateLabels(ctx, dates, box.x0, box.y0, box.plotW, box.plotH);
+}
+
+function drawArea(canvas, dates, values, opts) {
+  const { ctx, w, h } = setupCanvas(canvas, opts.height);
+  if (!values.length) return;
+  const min = Math.min(...values, 0);
+  const max = 0;
+  const span = (max - min) || 1;
+  const box = axes(ctx, w, h, { left: 62, right: 14, top: 12, bottom: 26 }, min, max, false);
+  const baseline = box.y0 + box.plotH - (max - min) / span * box.plotH;
+  ctx.beginPath();
+  values.forEach((v, i) => {
+    const x = box.x0 + (values.length > 1 ? box.plotW * i / (values.length - 1) : 0);
+    const y = box.y0 + box.plotH - (v - min) / span * box.plotH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(box.x0 + box.plotW, baseline);
+  ctx.lineTo(box.x0, baseline);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(185,28,28,.16)"; ctx.fill();
+  ctx.beginPath();
+  values.forEach((v, i) => {
+    const x = box.x0 + (values.length > 1 ? box.plotW * i / (values.length - 1) : 0);
+    const y = box.y0 + box.plotH - (v - min) / span * box.plotH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = "#b91c1c"; ctx.lineWidth = 1.5; ctx.stroke();
+  dateLabels(ctx, dates, box.x0, box.y0, box.plotW, box.plotH);
+}
+
+/* ------------------------------ 表格 ------------------------------ */
+function renderHeatmap(monthly) {
+  if (!monthly || !monthly.length) {
+    $("heatmap").innerHTML = '<p class="empty">无月度数据</p>';
+    return;
+  }
+  const vals = monthly.flatMap((r) => r.months).filter((v) => v !== null && Number.isFinite(v));
+  const maxAbs = Math.max(...vals.map(Math.abs), 0.0001);
+  const months = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+  let html = '<table class="heat"><thead><tr><th></th>' +
+    months.map((m) => `<th>${m}月</th>`).join("") + "</tr></thead><tbody>";
+  for (const row of monthly) {
+    html += `<tr><td class="year">${row.year}</td>`;
+    for (const v of row.months) {
+      if (v === null || !Number.isFinite(v)) { html += "<td></td>"; continue; }
+      const alpha = Math.min(Math.abs(v) / maxAbs, 1) * 0.78 + 0.08;
+      const bg = v >= 0 ? `rgba(21,128,61,${alpha.toFixed(2)})` : `rgba(185,28,28,${alpha.toFixed(2)})`;
+      const color = alpha > 0.45 ? "#fff" : "#334155";
+      html += `<td style="background:${bg};color:${color}">${(v * 100).toFixed(1)}</td>`;
+    }
+    html += "</tr>";
+  }
+  $("heatmap").innerHTML = html + "</tbody></table>";
+}
+
+function renderPositions(rows) {
+  if (!rows || !rows.length) {
+    $("positions").innerHTML = '<p class="empty">期末空仓</p>';
+    return;
+  }
+  const body = rows.map((r) => `<tr>
+    <td>${escapeHtml(r.ticker)}</td><td>${Number(r.shares).toLocaleString()}</td>
+    <td>${fmtNum(r.avg_cost)}</td><td>${fmtNum(r.last_price)}</td>
+    <td>${fmtMoney(r.market_value)}</td><td>${fmtPct(r.weight)}</td></tr>`).join("");
+  $("positions").innerHTML = `<div class="tablewrap"><table>
+    <thead><tr><th>标的</th><th>股数</th><th>成本价</th><th>最新价</th><th>市值</th><th>权重</th></tr></thead>
+    <tbody>${body}</tbody></table></div>`;
+}
+
+function renderSources(d) {
+  const chips = Object.entries(d.data_sources || {})
+    .map(([k, v]) => `<span class="chip">${escapeHtml(k)} · ${escapeHtml(String(v))}</span>`).join("");
+  $("sources").innerHTML = `<div class="chips">${chips || "未知"}</div>`;
+  const c = d.config;
+  $("runinfo").innerHTML = `<div class="kv">
+    <span>run_id</span><span>${escapeHtml(d.run_id)}</span>
+    <span>生成时间</span><span>${escapeHtml(d.created_at)}</span>
+    <span>交易日</span><span>${c.trading_days}</span>
+    <span>调仓次数</span><span>${d.metrics.rebalances ?? "—"}</span>
+    <span>期末现金</span><span>${fmtMoney(d.metrics.cash)}</span>
+  </div>`;
+}
+
+function renderTrades(trades, total) {
+  $("tradeCount").textContent = total ? `（共 ${total} 笔，展示最近 ${trades.length} 笔）` : "";
+  if (!trades || !trades.length) {
+    $("trades").innerHTML = '<p class="empty">回测期内没有成交</p>';
+    return;
+  }
+  const rows = trades.slice().reverse().map((t) => {
+    const isBuy = t.side === "BUY";
+    const pnl = (t.realized_pnl === null || t.realized_pnl === undefined)
+      ? "—" : `<span class="${parseFloat(t.realized_pnl) >= 0 ? "pos" : "neg"}">${fmtMoney(t.realized_pnl)}</span>`;
+    return `<tr><td>${escapeHtml(t.date)}</td><td>${escapeHtml(t.ticker)}</td>
+      <td><span class="tag ${isBuy ? "buy" : "sell"}">${isBuy ? "买入" : "卖出"}</span></td>
+      <td>${Number(t.shares).toLocaleString()}</td><td>${fmtNum(t.price)}</td>
+      <td>${fmtMoney(t.notional)}</td><td>${fmtNum(t.fee)}</td><td>${pnl}</td></tr>`;
+  }).join("");
+  $("trades").innerHTML = `<table><thead><tr><th>日期</th><th>标的</th><th>方向</th><th>股数</th>
+    <th>成交价</th><th>成交额</th><th>费用</th><th>已实现盈亏</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+init();
+</script>
+</body>
+</html>
